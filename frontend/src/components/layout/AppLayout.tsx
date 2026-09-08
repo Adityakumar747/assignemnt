@@ -8,18 +8,14 @@ import {
   FileSpreadsheet,
   Layers,
   LogOut,
-  Building2,
-  Sun,
-  Moon
+  Building2
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext.js';
-import { useTheme } from '../../context/ThemeContext.js';
 import { RoleBadge } from '../common/Badge.js';
 import clsx from 'clsx';
 
 export const AppLayout: React.FC = () => {
   const { user, logout } = useAuth();
-  const { theme, toggleTheme } = useTheme();
   const location = useLocation();
 
   const navItems = [
@@ -156,20 +152,6 @@ export const AppLayout: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-3 sm:gap-4">
-            {/* Theme Toggle Button (Light / Dark) */}
-            <button
-              onClick={toggleTheme}
-              className="p-2 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 hover:text-orange-500 dark:hover:text-orange-400 hover:border-orange-300 dark:hover:border-orange-500/40 transition-all shadow-sm"
-              title={`Switch to ${theme === 'dark' ? 'Light' : 'Dark'} Mode`}
-              aria-label="Toggle theme"
-            >
-              {theme === 'dark' ? (
-                <Sun className="w-4 h-4 text-orange-400" />
-              ) : (
-                <Moon className="w-4 h-4 text-zinc-600" />
-              )}
-            </button>
-
             <div className="text-right hidden sm:block">
               <div className="text-xs font-medium text-zinc-900 dark:text-zinc-200">{user?.name}</div>
               <div className="text-[11px] font-mono text-zinc-500 dark:text-zinc-400 capitalize">

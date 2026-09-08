@@ -49,7 +49,7 @@ export const LoginPage: React.FC = () => {
 
   const fillSampleEmail = (sampleEmail: string) => {
     setEmail(sampleEmail);
-    // Do NOT auto-fill password — user must enter it
+    setPassword('Password123!');
     setError(null);
   };
 
@@ -217,7 +217,7 @@ export const LoginPage: React.FC = () => {
             {showCredentialsHint && (
               <div className="mt-3 p-3.5 rounded-xl bg-zinc-50 border border-zinc-200 text-xs space-y-2 animate-fadeIn">
                 <div className="text-[11px] text-zinc-600">
-                  Click an account to fill the email — enter your password manually:
+                  Click an account to auto-fill credentials:
                 </div>
                 <div className="grid grid-cols-2 gap-1.5">
                   <button
@@ -256,8 +256,9 @@ export const LoginPage: React.FC = () => {
                     <div className="text-[10px] text-zinc-500 font-mono">accounts@ops.local</div>
                   </button>
                 </div>
-                <div className="text-[10px] text-zinc-400 pt-1">
-                  All test accounts share the same password. Contact your system administrator if needed.
+                <div className="text-[10px] text-zinc-400 pt-1 flex items-center gap-1.5">
+                  <span>Password for all accounts:</span>
+                  <code className="font-mono text-zinc-700 font-semibold bg-zinc-100 px-1.5 py-0.5 rounded border border-zinc-200">Password123!</code>
                 </div>
               </div>
             )}
