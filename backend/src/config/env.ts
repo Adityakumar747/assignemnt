@@ -18,7 +18,9 @@ if (!parsed.success) {
   process.exit(1);
 }
 
+const data = parsed.data!;
+
 export const env = {
-  ...parsed.data,
-  PORT: parseInt(parsed.data.PORT, 10)
+  ...data,
+  PORT: parseInt(data.PORT, 10)
 };
