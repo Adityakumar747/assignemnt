@@ -4,6 +4,11 @@
 > Demonstrates production-grade business logic, RBAC, atomic transactions, and clean architecture across a React + Node.js + PostgreSQL monorepo.
 
 ---
+## Live Demo
+
+**Frontend:** https://frontend-one-tau-q4g3nd4o4b.vercel.app/
+
+**Backend API:** https://assignemnt-1-u0qp.onrender.com
 
 ## Table of Contents
 
