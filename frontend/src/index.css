@@ -8,22 +8,38 @@
     font-feature-settings: "tnum", "cv02", "cv03", "cv04", "cv11";
   }
 
-  /* Custom subtle scrollbar */
+  html.dark {
+    color-scheme: dark;
+  }
+
+  html:not(.dark) {
+    color-scheme: light;
+  }
+
+  /* Adaptive subtle scrollbars */
   ::-webkit-scrollbar {
     width: 6px;
     height: 6px;
   }
 
   ::-webkit-scrollbar-track {
-    background: #09090b;
+    background: transparent;
   }
 
   ::-webkit-scrollbar-thumb {
-    background: #27272a;
+    background: #d4d4d8;
     border-radius: 3px;
   }
 
+  .dark ::-webkit-scrollbar-thumb {
+    background: #27272a;
+  }
+
   ::-webkit-scrollbar-thumb:hover {
+    background: #a1a1aa;
+  }
+
+  .dark ::-webkit-scrollbar-thumb:hover {
     background: #3f3f46;
   }
 }
@@ -33,15 +49,22 @@
     font-variant-numeric: tabular-nums;
   }
 
+  /* Adaptive grid background */
   .industrial-grid {
     background-size: 32px 32px;
+    background-image: 
+      linear-gradient(to right, rgba(0, 0, 0, 0.03) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(0, 0, 0, 0.03) 1px, transparent 1px);
+  }
+
+  .dark .industrial-grid {
     background-image: 
       linear-gradient(to right, rgba(255, 255, 255, 0.02) 1px, transparent 1px),
       linear-gradient(to bottom, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
   }
 
   .glow-orange {
-    box-shadow: 0 0 25px -5px rgba(234, 88, 12, 0.35);
+    box-shadow: 0 0 25px -5px rgba(255, 102, 0, 0.35);
   }
 }
 

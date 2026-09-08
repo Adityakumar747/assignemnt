@@ -1,5 +1,5 @@
 import React from 'react';
-import { NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom';
+import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
   LayoutDashboard,
@@ -8,7 +8,6 @@ import {
   FileSpreadsheet,
   Layers,
   LogOut,
-  ShieldCheck,
   Building2,
   Sun,
   Moon
@@ -16,13 +15,11 @@ import {
 import { useAuth } from '../../context/AuthContext.js';
 import { useTheme } from '../../context/ThemeContext.js';
 import { RoleBadge } from '../common/Badge.js';
-import { Role } from '../../types/index.js';
 import clsx from 'clsx';
 
 export const AppLayout: React.FC = () => {
-  const { user, logout, switchRole } = useAuth();
+  const { user, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
-  const navigate = useNavigate();
   const location = useLocation();
 
   const navItems = [
@@ -130,34 +127,6 @@ export const AppLayout: React.FC = () => {
           })}
         </nav>
 
-        {/* Role Quick Switcher for Evaluators */}
-        <div className="p-3 border-t border-zinc-200 dark:border-zinc-800/80 bg-zinc-50/50 dark:bg-zinc-900/30">
-          <div className="text-[10px] font-mono uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-2 flex items-center justify-between">
-            <span className="flex items-center gap-1">
-              <ShieldCheck className="w-3 h-3 text-orange-500" />
-              <span>Evaluator Role Switch</span>
-            </span>
-          </div>
-          <div className="grid grid-cols-2 gap-1.5">
-            {(['ADMIN', 'SALES', 'WAREHOUSE', 'ACCOUNTS'] as Role[]).map((r) => (
-              <button
-                key={r}
-                onClick={async () => {
-                  await switchRole(r);
-                  navigate('/dashboard');
-                }}
-                className={clsx(
-                  'text-[10px] font-mono py-1 px-1.5 rounded-lg transition-all text-center uppercase tracking-wide border',
-                  user?.role === r
-                    ? 'bg-orange-600 text-white font-bold border-orange-500 shadow'
-                    : 'bg-white dark:bg-zinc-900 text-zinc-700 dark:text-zinc-300 border-zinc-200 dark:border-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:text-zinc-900 dark:hover:text-white'
-                )}
-              >
-                {r}
-              </button>
-            ))}
-          </div>
-        </div>
 
         {/* Footer Logout */}
         <div className="p-3 border-t border-zinc-200 dark:border-zinc-800/80">
