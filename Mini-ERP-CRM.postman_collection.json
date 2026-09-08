@@ -1,0 +1,511 @@
+﻿{
+  "info": {
+    "name": "Mini ERP + CRM — Operations Portal API",
+    "_postman_id": "mini-erp-crm-api-collection",
+    "description": "Complete API collection for the Mini ERP + CRM Operations Portal.\n\n## Setup\n1. Import this collection into Postman.\n2. Set the `baseUrl` variable (default: `http://localhost:5000`).\n3. Run **Login as Admin** (or any role) — the `authToken` variable auto-populates.\n4. All protected endpoints will automatically use the token.\n\n## Test Credentials (seeded)\n| Role | Email | Password |\n|------|-------|----------|\n| Admin | admin@ops.local | Password123! |\n| Sales | sales@ops.local | Password123! |\n| Warehouse | warehouse@ops.local | Password123! |\n| Accounts | accounts@ops.local | Password123! |",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:5000", "type": "string" },
+    { "key": "authToken", "value": "", "type": "string" },
+    { "key": "customerId", "value": "", "type": "string" },
+    { "key": "productId", "value": "", "type": "string" },
+    { "key": "challanId", "value": "", "type": "string" }
+  ],
+  "item": [
+    {
+      "name": "Health Check",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/health",
+        "description": "Verify the server is running."
+      }
+    },
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Login as Admin",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if (res.token) {",
+                  "  pm.collectionVariables.set('authToken', res.token);",
+                  "  console.log('Token saved:', res.token.substring(0, 20) + '...');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/api/auth/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@ops.local\",\n  \"password\": \"Password123!\"\n}"
+            },
+            "description": "Login as Admin. Auto-saves JWT to `authToken` variable."
+          }
+        },
+        {
+          "name": "Login as Sales",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if (res.token) pm.collectionVariables.set('authToken', res.token);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/api/auth/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"sales@ops.local\",\n  \"password\": \"Password123!\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Login as Warehouse",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if (res.token) pm.collectionVariables.set('authToken', res.token);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/api/auth/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"warehouse@ops.local\",\n  \"password\": \"Password123!\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Login as Accounts",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if (res.token) pm.collectionVariables.set('authToken', res.token);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/api/auth/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"accounts@ops.local\",\n  \"password\": \"Password123!\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Get Current User (/me)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{authToken}}" }],
+            "url": "{{baseUrl}}/api/auth/me",
+            "description": "Returns the currently authenticated user's profile and role."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Customers (CRM)",
+      "item": [
+        {
+          "name": "List Customers",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{authToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/customers?page=1&limit=10",
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "10" },
+                { "key": "search", "value": "", "disabled": true },
+                { "key": "status", "value": "ACTIVE", "disabled": true },
+                { "key": "type", "value": "WHOLESALE", "disabled": true }
+              ]
+            },
+            "description": "Paginated customer list. Supports search, status, and type filters."
+          }
+        },
+        {
+          "name": "Create Customer",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if (res.data && res.data.id) pm.collectionVariables.set('customerId', res.data.id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": "{{baseUrl}}/api/customers",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Rajesh Kumar\",\n  \"mobile\": \"9876543210\",\n  \"email\": \"rajesh@example.com\",\n  \"businessName\": \"Kumar Traders Pvt Ltd\",\n  \"gstNumber\": \"29AABCU9603R1ZX\",\n  \"customerType\": \"WHOLESALE\",\n  \"address\": \"#42, MG Road, Bengaluru, Karnataka 560001\",\n  \"status\": \"ACTIVE\",\n  \"followUpDate\": \"2025-03-15T00:00:00.000Z\"\n}"
+            },
+            "description": "Create a new customer. Auto-saves `customerId`."
+          }
+        },
+        {
+          "name": "Get Customer by ID",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{authToken}}" }],
+            "url": "{{baseUrl}}/api/customers/{{customerId}}",
+            "description": "Fetch full customer profile including notes."
+          }
+        },
+        {
+          "name": "Update Customer",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": "{{baseUrl}}/api/customers/{{customerId}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"INACTIVE\",\n  \"followUpDate\": \"2025-06-01T00:00:00.000Z\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Add Customer Note",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": "{{baseUrl}}/api/customers/{{customerId}}/notes",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"note\": \"Spoke to the client — interested in bulk order for Q2. Follow up end of March.\"\n}"
+            },
+            "description": "Add a timestamped note to a customer's CRM timeline."
+          }
+        },
+        {
+          "name": "Delete Customer",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{authToken}}" }],
+            "url": "{{baseUrl}}/api/customers/{{customerId}}",
+            "description": "Admin only. Soft or hard delete depending on configuration."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Products & Inventory",
+      "item": [
+        {
+          "name": "List Products",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{authToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/products?page=1&limit=20",
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "20" },
+                { "key": "search", "value": "", "disabled": true },
+                { "key": "category", "value": "", "disabled": true },
+                { "key": "lowStock", "value": "true", "disabled": true }
+              ]
+            },
+            "description": "Paginated product list. Use `lowStock=true` to filter items below `minStockAlert`."
+          }
+        },
+        {
+          "name": "Create Product",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if (res.data && res.data.id) pm.collectionVariables.set('productId', res.data.id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": "{{baseUrl}}/api/products",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Heavy Duty Bolt M12\",\n  \"sku\": \"HW-BOLT-M12\",\n  \"category\": \"Fasteners\",\n  \"unitPrice\": 4.50,\n  \"currentStock\": 500,\n  \"minStockAlert\": 50,\n  \"location\": \"Rack B-7\"\n}"
+            },
+            "description": "Create product. Admin / Warehouse only. Auto-saves `productId`."
+          }
+        },
+        {
+          "name": "Get Product by ID",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{authToken}}" }],
+            "url": "{{baseUrl}}/api/products/{{productId}}"
+          }
+        },
+        {
+          "name": "Update Product",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": "{{baseUrl}}/api/products/{{productId}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"unitPrice\": 5.00,\n  \"minStockAlert\": 75\n}"
+            }
+          }
+        },
+        {
+          "name": "Adjust Stock (IN)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": "{{baseUrl}}/api/products/{{productId}}/stock",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"quantity\": 200,\n  \"type\": \"IN\",\n  \"reason\": \"Received from supplier — PO-2024-0034\"\n}"
+            },
+            "description": "Atomic IN stock movement. Updates `currentStock` and creates `StockMovement` record in a single transaction."
+          }
+        },
+        {
+          "name": "Adjust Stock (OUT)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": "{{baseUrl}}/api/products/{{productId}}/stock",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"quantity\": 10,\n  \"type\": \"OUT\",\n  \"reason\": \"Manual dispatch — warehouse ops\"\n}"
+            },
+            "description": "Atomic OUT stock movement. Returns 400 if stock would go negative."
+          }
+        },
+        {
+          "name": "Get Stock Ledger (All Movements)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{authToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/products/movements?page=1&limit=50",
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "50" },
+                { "key": "productId", "value": "", "disabled": true },
+                { "key": "type", "value": "", "disabled": true }
+              ]
+            },
+            "description": "Full audit log of all stock movements across all products. Accounts / Warehouse / Admin."
+          }
+        },
+        {
+          "name": "Delete Product",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{authToken}}" }],
+            "url": "{{baseUrl}}/api/products/{{productId}}",
+            "description": "Admin only. Fails if product has stock movements or challan items."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Sales Challans",
+      "item": [
+        {
+          "name": "List Challans",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{authToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/challans?page=1&limit=20",
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "20" },
+                { "key": "status", "value": "DRAFT", "disabled": true },
+                { "key": "customerId", "value": "", "disabled": true }
+              ]
+            },
+            "description": "Paginated challan list. Filter by status (DRAFT, CONFIRMED, CANCELLED) or customerId."
+          }
+        },
+        {
+          "name": "Create Challan (Draft)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if (res.data && res.data.id) pm.collectionVariables.set('challanId', res.data.id);",
+                  "if (res.data) console.log('Challan #:', res.data.challanNumber);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": "{{baseUrl}}/api/challans",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customerId\": \"{{customerId}}\",\n  \"items\": [\n    {\n      \"productId\": \"{{productId}}\",\n      \"quantity\": 5\n    }\n  ]\n}"
+            },
+            "description": "Creates a DRAFT challan with auto-generated sequential number (CH-YYYY-XXXX). Captures immutable product snapshots. Auto-saves `challanId`."
+          }
+        },
+        {
+          "name": "Get Challan by ID",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{authToken}}" }],
+            "url": "{{baseUrl}}/api/challans/{{challanId}}",
+            "description": "Full challan details including items with immutable price snapshots."
+          }
+        },
+        {
+          "name": "Confirm Challan",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": "{{baseUrl}}/api/challans/{{challanId}}/confirm",
+            "body": { "mode": "raw", "raw": "{}" },
+            "description": "Atomically confirms the challan: reduces stock for all items in a single DB transaction. Returns 400 if any item has insufficient stock."
+          }
+        },
+        {
+          "name": "Cancel Challan",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": "{{baseUrl}}/api/challans/{{challanId}}/cancel",
+            "body": { "mode": "raw", "raw": "{}" },
+            "description": "Cancels the challan. If it was CONFIRMED, creates reversal IN stock movements to restock all items atomically."
+          }
+        },
+        {
+          "name": "Download Challan PDF",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{authToken}}" }],
+            "url": "{{baseUrl}}/api/challans/{{challanId}}/pdf",
+            "description": "Returns a PDF file download of the challan/invoice. Uses immutable snapshots to ensure the document matches what was confirmed."
+          }
+        }
+      ]
+    },
+    {
+      "name": "RBAC Tests",
+      "item": [
+        {
+          "name": "[Should Fail] Sales cannot adjust stock",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": "{{baseUrl}}/api/products/{{productId}}/stock",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"quantity\": 10,\n  \"type\": \"IN\",\n  \"reason\": \"This should fail for Sales role\"\n}"
+            },
+            "description": "Expected: 403 Forbidden. Run after logging in as Sales."
+          }
+        },
+        {
+          "name": "[Should Fail] Accounts cannot create customer",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": "{{baseUrl}}/api/customers",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Test\",\n  \"mobile\": \"1234567890\",\n  \"email\": \"test@test.com\",\n  \"businessName\": \"Test Co\",\n  \"customerType\": \"RETAIL\",\n  \"address\": \"Test Address\"\n}"
+            },
+            "description": "Expected: 403 Forbidden. Run after logging in as Accounts."
+          }
+        },
+        {
+          "name": "[Should Fail] Unauthenticated request",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/customers",
+            "description": "Expected: 401 Unauthorized. No Authorization header."
+          }
+        }
+      ]
+    }
+  ]
+}
