@@ -45,6 +45,13 @@ router.put(
   productController.updateProduct
 );
 
+router.delete(
+  '/:id',
+  authorize(Role.ADMIN),
+  productController.deleteProduct
+);
+
+
 router.post(
   '/:id/stock-movements',
   authorize(Role.ADMIN, Role.WAREHOUSE),

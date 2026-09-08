@@ -29,6 +29,11 @@ export async function updateProduct(id: string, data: Partial<Product>): Promise
   return res.data.data;
 }
 
+export async function deleteProduct(id: string): Promise<void> {
+  await api.delete(`/products/${id}`);
+}
+
+
 export async function createStockMovement(
   productId: string,
   data: { quantityChanged: number; movementType: 'IN' | 'OUT'; reason: string }

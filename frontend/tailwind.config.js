@@ -1,5 +1,6 @@
 /** @type {import('tailwindcss').Config} */
 export default {
+  darkMode: 'class',
   content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
   theme: {
     extend: {
@@ -23,16 +24,17 @@ export default {
           dark: '#121215',
           grey: '#27272a',
           light: '#f4f4f5',
-          orange: '#ea580c',
-          orangeHover: '#c2410c'
+          orange: '#ff6600', // Electric bright orange
+          orangeHover: '#e65c00',
+          brightOrange: '#ff781f'
         },
         amber: {
-          accent: '#ea580c', // Pure vibrant enterprise orange
-          bright: '#f97316', // Crisp bright orange
-          glow: '#fb923c'    // Warm orange highlight
+          accent: '#ff6600', // Bright primary orange
+          bright: '#ff781f', // Vibrant neon orange
+          glow: '#ff944d'    // Glowing orange
         },
         status: {
-          draft: '#f97316',
+          draft: '#ff781f',
           confirmed: '#10b981',
           cancelled: '#71717a',
           low: '#ef4444',

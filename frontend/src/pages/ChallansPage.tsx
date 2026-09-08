@@ -9,15 +9,9 @@ import {
   CheckCircle2,
   XCircle,
   Download,
-  Printer,
   X,
   Trash2,
-  AlertTriangle,
-  FileText,
-  User,
-  Calendar,
-  Building,
-  ShieldAlert
+  AlertTriangle
 } from 'lucide-react';
 import {
   getChallans,
@@ -29,7 +23,7 @@ import {
 } from '../api/challans.js';
 import { getCustomers } from '../api/customers.js';
 import { getProducts } from '../api/products.js';
-import { Challan, ChallanStatus, Product, Customer } from '../types/index.js';
+import { Challan } from '../types/index.js';
 import { ChallanStatusBadge } from '../components/common/Badge.js';
 import { TableSkeleton, Skeleton } from '../components/common/Skeleton.js';
 import { useToast } from '../context/ToastContext.js';
@@ -42,10 +36,10 @@ interface LineItem {
 }
 
 export const ChallansPage: React.FC = () => {
-  const { canManageChallans, user } = useAuth();
+  const { canManageChallans } = useAuth();
   const queryClient = useQueryClient();
   const toast = useToast();
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams] = useSearchParams();
 
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('');
@@ -60,66 +54,61 @@ export const ChallansPage: React.FC = () => {
   const [items, setItems] = useState<LineItem[]>([{ productId: '', quantity: 1 }]);
   const [isConfirmingImmediately, setIsConfirmingImmediately] = useState(false);
 
-  // Read URL query params on mount
+  // Auto-open create modal if query string specifies ?new=true
   useEffect(() => {
     if (searchParams.get('new') === 'true') {
       setIsCreateModalOpen(true);
-      searchParams.delete('new');
-      setSearchParams(searchParams);
     }
-    const idParam = searchParams.get('id');
-    if (idParam) {
-      setSelectedChallanId(idParam);
-      searchParams.delete('id');
-      setSearchParams(searchParams);
+    const challanIdParam = searchParams.get('id');
+    if (challanIdParam) {
+      setSelectedChallanId(challanIdParam);
     }
-  }, [searchParams, setSearchParams]);
+  }, [searchParams]);
 
   // 1. Fetch Challans List
   const { data, isLoading } = useQuery({
     queryKey: ['challans', { search, status: statusFilter, page }],
     queryFn: () =>
       getChallans({
-        search: search || undefined,
         status: statusFilter || undefined,
         page,
         limit: 10
       })
   });
 
-  // 2. Fetch Selected Challan Details
+  // 2. Fetch Selected Challan Detail
   const { data: detailChallan, isLoading: loadingDetail } = useQuery({
     queryKey: ['challan-detail', selectedChallanId],
     queryFn: () => getChallanById(selectedChallanId!),
     enabled: !!selectedChallanId
   });
 
-  // 3. Customers & Products for Challan Creation
+  // 3. Lookups for Create Modal
   const { data: customersData } = useQuery({
-    queryKey: ['dropdown-customers'],
+    queryKey: ['lookup-customers'],
     queryFn: () => getCustomers({ limit: 100 }),
     enabled: isCreateModalOpen
   });
 
   const { data: productsData } = useQuery({
-    queryKey: ['dropdown-products'],
+    queryKey: ['lookup-products'],
     queryFn: () => getProducts({ limit: 100 }),
     enabled: isCreateModalOpen
   });
 
-  const productList = productsData?.data || [];
   const customerList = customersData?.data || [];
+  const productList = productsData?.data || [];
 
-  // Line item helpers
+  // Line item manipulation
   const handleAddItem = () => {
     setItems((prev) => [...prev, { productId: '', quantity: 1 }]);
   };
 
   const handleRemoveItem = (index: number) => {
-    setItems((prev) => prev.filter((_, idx) => idx !== index));
+    setItems((prev) => prev.filter((_, i) => i !== index));
   };
 
-  const handleItemChange = (index: number, field: 'productId' | 'quantity', value: any) => {
+  const handleItemChange = (index: number, field: keyof LineItem, value: any) => {
     setItems((prev) => {
       const updated = [...prev];
       updated[index] = { ...updated[index], [field]: value };
@@ -127,106 +116,92 @@ export const ChallansPage: React.FC = () => {
     });
   };
 
-  // Compute live order summary
-  const totalOrderQty = items.reduce((acc, curr) => acc + (Number(curr.quantity) || 0), 0);
-  const totalOrderEst = items.reduce((acc, curr) => {
-    const prod = productList.find((p) => p.id === curr.productId);
-    return acc + (prod ? prod.unitPrice * (Number(curr.quantity) || 0) : 0);
+  // Calculations for preview
+  const totalOrderQty = items.reduce((acc, it) => acc + (Number(it.quantity) || 0), 0);
+  const totalOrderEst = items.reduce((acc, it) => {
+    const prod = productList.find((p) => p.id === it.productId);
+    return acc + (prod ? prod.unitPrice * (Number(it.quantity) || 0) : 0);
   }, 0);
 
-  // Check if any product has insufficient stock
-  const hasInsufficientStock = items.some((item) => {
-    if (!item.productId) return false;
-    const prod = productList.find((p) => p.id === item.productId);
-    return prod ? item.quantity > prod.currentStock : false;
+  const hasInsufficientStock = items.some((it) => {
+    const prod = productList.find((p) => p.id === it.productId);
+    return prod && it.quantity > prod.currentStock;
   });
 
-  // Create Challan Handler
-  const handleCreateSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedCustomerId) {
-      toast.error('Customer Required', 'Please select a consignee customer.');
-      return;
-    }
-
-    const validItems = items.filter((i) => i.productId && i.quantity > 0);
-    if (validItems.length === 0) {
-      toast.error('Items Required', 'Please add at least one valid product line.');
-      return;
-    }
-
-    try {
-      const challan = await createChallan({
-        customerId: selectedCustomerId,
-        items: validItems
-      });
-
-      // If user chose to confirm immediately
+  // Create Mutation
+  const createMutation = useMutation({
+    mutationFn: async (payload: { customerId: string; items: LineItem[] }) => {
+      const newChallan = await createChallan(payload);
       if (isConfirmingImmediately) {
-        try {
-          await confirmChallan(challan.id);
-          toast.success(
-            'Challan Created & Confirmed',
-            `${challan.challanNumber} confirmed. Inventory decremented.`
-          );
-        } catch (confirmErr) {
-          toast.warning(
-            'Saved as Draft (Confirm Failed)',
-            getErrorMessage(confirmErr)
-          );
-        }
-      } else {
-        toast.success(
-          'Draft Challan Generated',
-          `${challan.challanNumber} saved with historical product snapshots.`
-        );
+        await confirmChallan(newChallan.id);
       }
-
+      return newChallan;
+    },
+    onSuccess: (newChallan) => {
+      toast.success(
+        isConfirmingImmediately ? 'Challan Confirmed & Dispatched' : 'Draft Challan Created',
+        `Challan #${newChallan.challanNumber} saved.`
+      );
       queryClient.invalidateQueries({ queryKey: ['challans'] });
       queryClient.invalidateQueries({ queryKey: ['products'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-challans'] });
       setIsCreateModalOpen(false);
       setSelectedCustomerId('');
       setItems([{ productId: '', quantity: 1 }]);
-    } catch (err) {
-      toast.error('Failed to create challan', getErrorMessage(err));
+    },
+    onError: (err) => {
+      toast.error('Challan Creation Failed', getErrorMessage(err));
     }
-  };
+  });
 
   // Confirm Mutation
   const confirmMutation = useMutation({
     mutationFn: (id: string) => confirmChallan(id),
-    onSuccess: (data) => {
-      toast.success(
-        'Challan Confirmed',
-        `${data.challanNumber} confirmed. Inventory stock decremented & logged.`
-      );
+    onSuccess: (updated) => {
+      toast.success('Challan Confirmed', `${updated.challanNumber} confirmed. Stock decremented.`);
       queryClient.invalidateQueries({ queryKey: ['challans'] });
+      queryClient.invalidateQueries({ queryKey: ['challan-detail', updated.id] });
       queryClient.invalidateQueries({ queryKey: ['products'] });
-      queryClient.invalidateQueries({ queryKey: ['challan-detail', selectedChallanId] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-challans'] });
     },
     onError: (err) => {
-      toast.error('Confirmation Rejected', getErrorMessage(err));
+      toast.error('Confirmation Failed', getErrorMessage(err));
     }
   });
 
   // Cancel Mutation
   const cancelMutation = useMutation({
     mutationFn: (id: string) => cancelChallan(id),
-    onSuccess: (data) => {
-      toast.success(
-        'Challan Cancelled',
-        `${data.challanNumber} cancelled. Inventory items restocked.`
-      );
+    onSuccess: (updated) => {
+      toast.success('Challan Cancelled', `${updated.challanNumber} cancelled. Any dispatched stock returned.`);
       queryClient.invalidateQueries({ queryKey: ['challans'] });
+      queryClient.invalidateQueries({ queryKey: ['challan-detail', updated.id] });
       queryClient.invalidateQueries({ queryKey: ['products'] });
-      queryClient.invalidateQueries({ queryKey: ['challan-detail', selectedChallanId] });
     },
     onError: (err) => {
       toast.error('Cancellation Failed', getErrorMessage(err));
     }
   });
 
-  // Handle PDF Download
+  const handleCreateSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedCustomerId) {
+      toast.error('Customer Required', 'Please select a consignee customer.');
+      return;
+    }
+
+    const validItems = items.filter((it) => it.productId && it.quantity > 0);
+    if (validItems.length === 0) {
+      toast.error('Products Required', 'Please add at least one valid product line item.');
+      return;
+    }
+
+    createMutation.mutate({
+      customerId: selectedCustomerId,
+      items: validItems
+    });
+  };
+
   const handlePdfDownload = async (c: Challan) => {
     try {
       await downloadChallanPdf(c.id, c.challanNumber);
@@ -239,15 +214,15 @@ export const ChallansPage: React.FC = () => {
   return (
     <div className="space-y-5">
       {/* 1. Page Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-ops-800 pb-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-zinc-200 dark:border-zinc-800 pb-4">
         <div>
-          <h1 className="text-xl font-bold tracking-tight text-white font-sans flex items-center gap-2">
+          <h1 className="text-xl font-bold tracking-tight text-zinc-900 dark:text-white font-sans flex items-center gap-2">
             <span>Sales Challan & Dispatch Ledger</span>
-            <span className="text-xs px-2 py-0.5 rounded font-mono bg-ops-800 text-slate-300">
+            <span className="text-xs px-2.5 py-0.5 rounded-full font-mono bg-orange-100 dark:bg-zinc-800 text-orange-700 dark:text-zinc-300 font-semibold">
               {data?.meta.total ?? 0} Challans
             </span>
           </h1>
-          <p className="text-xs text-slate-400 mt-1">
+          <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
             Official delivery challans, product snapshots, and automated inventory decrements.
           </p>
         </div>
@@ -259,7 +234,7 @@ export const ChallansPage: React.FC = () => {
               setItems([{ productId: '', quantity: 1 }]);
               setIsCreateModalOpen(true);
             }}
-            className="inline-flex items-center gap-2 px-3.5 py-2 rounded bg-amber-accent hover:bg-amber-bright text-ops-950 font-bold text-xs uppercase tracking-wider transition-all shadow"
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs uppercase tracking-wider transition-all shadow-sm"
           >
             <Plus className="w-4 h-4" />
             <span>Create Sales Challan</span>
@@ -268,9 +243,9 @@ export const ChallansPage: React.FC = () => {
       </div>
 
       {/* 2. Search & Filter Bar */}
-      <div className="p-3 rounded-lg bg-ops-900 border border-ops-800 flex flex-col md:flex-row gap-3 items-center justify-between">
+      <div className="p-3.5 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 flex flex-col md:flex-row gap-3 items-center justify-between shadow-sm">
         <div className="relative w-full md:w-80">
-          <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+          <Search className="w-4 h-4 text-zinc-400 absolute left-3.5 top-3" />
           <input
             type="text"
             placeholder="Search by Challan number or customer..."
@@ -279,12 +254,12 @@ export const ChallansPage: React.FC = () => {
               setSearch(e.target.value);
               setPage(1);
             }}
-            className="w-full bg-ops-950 border border-ops-700/80 rounded pl-9 pr-3 py-1.5 text-xs text-slate-200 placeholder-slate-400 focus:outline-none focus:border-amber-bright font-mono"
+            className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl pl-10 pr-3.5 py-2 text-xs text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 font-mono transition-all"
           />
         </div>
 
         <div className="flex items-center gap-2.5 w-full md:w-auto">
-          <div className="flex items-center gap-1.5 text-xs text-slate-400 font-mono">
+          <div className="flex items-center gap-1.5 text-xs text-zinc-500 dark:text-zinc-400 font-mono">
             <Filter className="w-3.5 h-3.5" />
             <span>Status:</span>
           </div>
@@ -294,7 +269,7 @@ export const ChallansPage: React.FC = () => {
               setStatusFilter(e.target.value);
               setPage(1);
             }}
-            className="bg-ops-950 border border-ops-700/80 rounded px-2.5 py-1.5 text-xs text-slate-200 font-mono focus:outline-none focus:border-amber-bright"
+            className="bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl px-3 py-2 text-xs text-zinc-800 dark:text-zinc-200 font-mono focus:outline-none focus:border-orange-500"
           >
             <option value="">All Statuses</option>
             <option value="DRAFT">DRAFT</option>
@@ -305,14 +280,14 @@ export const ChallansPage: React.FC = () => {
       </div>
 
       {/* 3. Challans Table */}
-      <div className="rounded-lg bg-ops-900 border border-ops-800 overflow-hidden shadow-lg">
+      <div className="rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 overflow-hidden shadow-sm">
         {isLoading ? (
           <TableSkeleton rows={6} cols={6} />
         ) : data?.data.length === 0 ? (
           <div className="p-12 text-center">
-            <FileSpreadsheet className="w-10 h-10 text-slate-600 mx-auto mb-3" />
-            <div className="text-sm font-semibold text-slate-300">No Sales Challans Found</div>
-            <div className="text-xs text-slate-400 mt-1">
+            <FileSpreadsheet className="w-10 h-10 text-zinc-400 mx-auto mb-3" />
+            <div className="text-sm font-semibold text-zinc-800 dark:text-zinc-200">No Sales Challans Found</div>
+            <div className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
               Create a new challan to begin warehouse dispatch operations.
             </div>
           </div>
@@ -320,63 +295,63 @@ export const ChallansPage: React.FC = () => {
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="border-b border-ops-800 bg-ops-950/60 text-[11px] font-mono uppercase tracking-wider text-slate-400">
-                  <th className="py-3 px-4">Challan Number</th>
-                  <th className="py-3 px-4">Consignee Customer</th>
-                  <th className="py-3 px-4">Date Issued</th>
-                  <th className="py-3 px-4 text-right">Items Qty</th>
-                  <th className="py-3 px-4 text-right">Total (INR)</th>
-                  <th className="py-3 px-4 text-center">Status</th>
-                  <th className="py-3 px-4 text-right">Actions</th>
+                <tr className="border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50/80 dark:bg-zinc-950/70 text-[11px] font-mono uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+                  <th className="py-3.5 px-4">Challan Number</th>
+                  <th className="py-3.5 px-4">Consignee Customer</th>
+                  <th className="py-3.5 px-4">Date Issued</th>
+                  <th className="py-3.5 px-4 text-right">Items Qty</th>
+                  <th className="py-3.5 px-4 text-right">Total (INR)</th>
+                  <th className="py-3.5 px-4 text-center">Status</th>
+                  <th className="py-3.5 px-4 text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-ops-800/60 text-xs">
+              <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800 text-xs">
                 {data?.data.map((c) => (
                   <tr
                     key={c.id}
                     onClick={() => setSelectedChallanId(c.id)}
-                    className="hover:bg-ops-850/60 transition-colors group cursor-pointer"
+                    className="hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors group cursor-pointer"
                   >
-                    <td className="py-3 px-4">
-                      <div className="font-mono font-bold text-white group-hover:text-amber-glow transition-colors">
+                    <td className="py-3.5 px-4">
+                      <div className="font-mono font-bold text-zinc-900 dark:text-white group-hover:text-orange-600 dark:group-hover:text-orange-400 transition-colors">
                         {c.challanNumber}
                       </div>
-                      <div className="text-[10px] text-slate-400 font-mono">
+                      <div className="text-[10px] text-zinc-500 dark:text-zinc-400 font-mono">
                         By {c.createdBy?.name || 'Staff'}
                       </div>
                     </td>
 
-                    <td className="py-3 px-4">
-                      <div className="font-semibold text-slate-200">
+                    <td className="py-3.5 px-4">
+                      <div className="font-semibold text-zinc-900 dark:text-zinc-200">
                         {c.customer?.businessName || 'Customer'}
                       </div>
-                      <div className="text-[11px] text-slate-400 font-mono">
+                      <div className="text-[11px] text-zinc-500 dark:text-zinc-400 font-mono">
                         {c.customer?.name} ({c.customer?.mobile})
                       </div>
                     </td>
 
-                    <td className="py-3 px-4 font-mono text-slate-300">
+                    <td className="py-3.5 px-4 font-mono text-zinc-700 dark:text-zinc-300">
                       {new Date(c.createdAt).toLocaleDateString('en-GB')}
                     </td>
 
-                    <td className="py-3 px-4 text-right font-mono text-slate-200">
+                    <td className="py-3.5 px-4 text-right font-mono text-zinc-800 dark:text-zinc-200">
                       {c.totalQuantity} units
                     </td>
 
-                    <td className="py-3 px-4 text-right font-mono font-bold text-amber-glow">
+                    <td className="py-3.5 px-4 text-right font-mono font-bold text-orange-600 dark:text-orange-400">
                       ₹{c.totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                     </td>
 
-                    <td className="py-3 px-4 text-center">
+                    <td className="py-3.5 px-4 text-center">
                       <ChallanStatusBadge status={c.status} />
                     </td>
 
-                    <td className="py-3 px-4 text-right" onClick={(e) => e.stopPropagation()}>
+                    <td className="py-3.5 px-4 text-right" onClick={(e) => e.stopPropagation()}>
                       <div className="flex items-center justify-end gap-1.5">
                         {/* PDF Export button */}
                         <button
                           onClick={() => handlePdfDownload(c)}
-                          className="p-1.5 rounded hover:bg-ops-700 text-slate-300 hover:text-amber-bright transition-colors"
+                          className="p-1.5 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-500 dark:text-zinc-400 hover:text-orange-600 dark:hover:text-orange-400 transition-colors"
                           title="Download PDF Invoice / Delivery Challan"
                         >
                           <Download className="w-3.5 h-3.5" />
@@ -387,10 +362,10 @@ export const ChallansPage: React.FC = () => {
                           <button
                             onClick={() => confirmMutation.mutate(c.id)}
                             disabled={confirmMutation.isPending}
-                            className="px-2 py-1 rounded bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/40 text-emerald-300 text-[11px] font-mono font-semibold flex items-center gap-1"
+                            className="px-2.5 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-500/15 hover:bg-emerald-100 dark:hover:bg-emerald-500/25 border border-emerald-200 dark:border-emerald-500/40 text-emerald-700 dark:text-emerald-300 text-[11px] font-mono font-semibold flex items-center gap-1 transition-colors"
                             title="Confirm challan & decrement inventory stock"
                           >
-                            <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                            <CheckCircle2 className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
                             <span>Confirm</span>
                           </button>
                         )}
@@ -398,7 +373,7 @@ export const ChallansPage: React.FC = () => {
                         {/* View details */}
                         <button
                           onClick={() => setSelectedChallanId(c.id)}
-                          className="px-2 py-1 rounded bg-ops-800 hover:bg-ops-700 text-slate-300 text-[11px] font-mono"
+                          className="px-2.5 py-1 rounded-lg bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 text-[11px] font-mono transition-colors"
                         >
                           Details
                         </button>
@@ -413,7 +388,7 @@ export const ChallansPage: React.FC = () => {
 
         {/* Pagination Bar */}
         {data && data.meta.totalPages > 1 && (
-          <div className="p-3 border-t border-ops-800 flex items-center justify-between text-xs font-mono text-slate-400">
+          <div className="p-3.5 border-t border-zinc-200 dark:border-zinc-800 flex items-center justify-between text-xs font-mono text-zinc-500 dark:text-zinc-400">
             <div>
               Showing page {data.meta.page} of {data.meta.totalPages} ({data.meta.total} records)
             </div>
@@ -421,14 +396,14 @@ export const ChallansPage: React.FC = () => {
               <button
                 disabled={page <= 1}
                 onClick={() => setPage((p) => p - 1)}
-                className="px-2.5 py-1 rounded bg-ops-800 hover:bg-ops-700 disabled:opacity-40"
+                className="px-3 py-1 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-700 disabled:opacity-40"
               >
                 Previous
               </button>
               <button
                 disabled={page >= data.meta.totalPages}
                 onClick={() => setPage((p) => p + 1)}
-                className="px-2.5 py-1 rounded bg-ops-800 hover:bg-ops-700 disabled:opacity-40"
+                className="px-3 py-1 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-700 disabled:opacity-40"
               >
                 Next
               </button>
@@ -439,16 +414,16 @@ export const ChallansPage: React.FC = () => {
 
       {/* 4. Challan Detail Modal (Snapshots inspection, confirm, cancel, print, download) */}
       {selectedChallanId && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="w-full max-w-3xl bg-ops-900 border border-ops-800 rounded-lg shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="w-full max-w-3xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
             {/* Header */}
-            <div className="p-5 border-b border-ops-800 flex items-center justify-between bg-ops-950/40">
+            <div className="p-5 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between bg-zinc-50/50 dark:bg-zinc-950/40">
               <div>
-                <div className="text-[11px] font-mono uppercase text-slate-400 flex items-center gap-2">
+                <div className="text-[11px] font-mono uppercase text-zinc-500 dark:text-zinc-400 flex items-center gap-2">
                   <span>Sales Dispatch Challan Inspection</span>
                   {detailChallan && <ChallanStatusBadge status={detailChallan.status} />}
                 </div>
-                <h2 className="text-lg font-bold text-white font-mono mt-0.5">
+                <h2 className="text-lg font-bold text-zinc-900 dark:text-white font-mono mt-0.5">
                   {detailChallan?.challanNumber || 'Loading details...'}
                 </h2>
               </div>
@@ -456,15 +431,15 @@ export const ChallansPage: React.FC = () => {
                 {detailChallan && (
                   <button
                     onClick={() => handlePdfDownload(detailChallan)}
-                    className="px-3 py-1.5 rounded bg-ops-800 hover:bg-ops-700 border border-ops-700 text-slate-200 text-xs font-mono flex items-center gap-1.5"
+                    className="px-3.5 py-1.5 rounded-xl bg-orange-50 dark:bg-orange-500/10 hover:bg-orange-100 dark:hover:bg-orange-500/20 border border-orange-200 dark:border-orange-500/30 text-orange-600 dark:text-orange-400 text-xs font-mono flex items-center gap-1.5 transition-colors font-medium"
                   >
-                    <Download className="w-3.5 h-3.5 text-amber-bright" />
+                    <Download className="w-3.5 h-3.5 text-orange-500" />
                     <span>PDF Invoice</span>
                   </button>
                 )}
                 <button
                   onClick={() => setSelectedChallanId(null)}
-                  className="p-1.5 rounded-lg text-slate-400 hover:text-white"
+                  className="p-1.5 rounded-xl text-zinc-400 hover:text-zinc-700 dark:hover:text-white"
                 >
                   <X className="w-5 h-5" />
                 </button>
@@ -481,46 +456,46 @@ export const ChallansPage: React.FC = () => {
               ) : detailChallan ? (
                 <>
                   {/* Consignee & Order Metadata */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 rounded bg-ops-950 border border-ops-800 text-xs">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 rounded-xl bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs">
                     <div>
-                      <div className="text-[10px] font-mono uppercase text-slate-400 mb-1">
+                      <div className="text-[10px] font-mono uppercase text-zinc-500 dark:text-zinc-400 mb-1">
                         Billed & Shipped To:
                       </div>
-                      <div className="font-bold text-white text-sm">
+                      <div className="font-bold text-zinc-900 dark:text-white text-sm">
                         {detailChallan.customer?.businessName}
                       </div>
-                      <div className="text-slate-300 mt-1">
+                      <div className="text-zinc-700 dark:text-zinc-300 mt-1">
                         Attn: {detailChallan.customer?.name} ({detailChallan.customer?.mobile})
                       </div>
-                      <div className="text-slate-400 mt-0.5">{detailChallan.customer?.address}</div>
-                      <div className="font-mono text-slate-400 mt-1">
+                      <div className="text-zinc-500 dark:text-zinc-400 mt-0.5">{detailChallan.customer?.address}</div>
+                      <div className="font-mono text-zinc-500 dark:text-zinc-400 mt-1">
                         GSTIN: {detailChallan.customer?.gstNumber || 'Unregistered'}
                       </div>
                     </div>
 
                     <div className="space-y-1 font-mono">
-                      <div className="text-[10px] uppercase text-slate-400 mb-1">
+                      <div className="text-[10px] uppercase text-zinc-500 dark:text-zinc-400 mb-1">
                         Challan Parameters:
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-slate-400">Challan Number:</span>
-                        <span className="text-white font-bold">{detailChallan.challanNumber}</span>
+                        <span className="text-zinc-500 dark:text-zinc-400">Challan Number:</span>
+                        <span className="text-zinc-900 dark:text-white font-bold">{detailChallan.challanNumber}</span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-slate-400">Date Generated:</span>
-                        <span className="text-white">
+                        <span className="text-zinc-500 dark:text-zinc-400">Date Generated:</span>
+                        <span className="text-zinc-900 dark:text-white">
                           {new Date(detailChallan.createdAt).toLocaleString('en-GB')}
                         </span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-slate-400">Prepared By:</span>
-                        <span className="text-white">
+                        <span className="text-zinc-500 dark:text-zinc-400">Prepared By:</span>
+                        <span className="text-zinc-900 dark:text-white">
                           {detailChallan.createdBy?.name} ({detailChallan.createdBy?.role})
                         </span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-slate-400">Current Status:</span>
-                        <span className="text-amber-bright font-bold">{detailChallan.status}</span>
+                        <span className="text-zinc-500 dark:text-zinc-400">Current Status:</span>
+                        <span className="text-orange-600 dark:text-orange-400 font-bold">{detailChallan.status}</span>
                       </div>
                     </div>
                   </div>
@@ -528,18 +503,18 @@ export const ChallansPage: React.FC = () => {
                   {/* Immutable Item Snapshots Table */}
                   <div>
                     <div className="flex items-center justify-between mb-2">
-                      <h3 className="text-xs font-mono uppercase tracking-wider font-bold text-slate-300">
+                      <h3 className="text-xs font-mono uppercase tracking-wider font-bold text-zinc-800 dark:text-zinc-200">
                         Item Snapshots (Locked at Creation Time)
                       </h3>
-                      <span className="text-[11px] font-mono text-slate-400">
+                      <span className="text-[11px] font-mono text-zinc-500 dark:text-zinc-400">
                         {detailChallan.items.length} Product Lines
                       </span>
                     </div>
 
-                    <div className="rounded border border-ops-800 overflow-hidden">
+                    <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 overflow-hidden shadow-sm">
                       <table className="w-full text-left text-xs">
                         <thead>
-                          <tr className="border-b border-ops-800 bg-ops-950 text-[10px] font-mono uppercase text-slate-400">
+                          <tr className="border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950 text-[10px] font-mono uppercase text-zinc-500 dark:text-zinc-400">
                             <th className="py-2.5 px-3">SKU</th>
                             <th className="py-2.5 px-3">Description</th>
                             <th className="py-2.5 px-3 text-right">Qty</th>
@@ -547,39 +522,39 @@ export const ChallansPage: React.FC = () => {
                             <th className="py-2.5 px-3 text-right">Line Total</th>
                           </tr>
                         </thead>
-                        <tbody className="divide-y divide-ops-800/60 font-mono">
+                        <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800 font-mono">
                           {detailChallan.items.map((item) => (
-                            <tr key={item.id} className="hover:bg-ops-850/40">
-                              <td className="py-2.5 px-3 text-amber-glow font-bold">
+                            <tr key={item.id} className="hover:bg-zinc-50 dark:hover:bg-zinc-800/40">
+                              <td className="py-2.5 px-3 text-orange-600 dark:text-orange-400 font-bold">
                                 {item.productSkuSnapshot}
                               </td>
-                              <td className="py-2.5 px-3 font-sans text-slate-200">
+                              <td className="py-2.5 px-3 font-sans text-zinc-800 dark:text-zinc-200">
                                 {item.productNameSnapshot}
                               </td>
-                              <td className="py-2.5 px-3 text-right text-white font-bold">
+                              <td className="py-2.5 px-3 text-right text-zinc-900 dark:text-white font-bold">
                                 {item.quantity}
                               </td>
-                              <td className="py-2.5 px-3 text-right text-slate-300">
+                              <td className="py-2.5 px-3 text-right text-zinc-700 dark:text-zinc-300">
                                 ₹{item.unitPriceSnapshot.toFixed(2)}
                               </td>
-                              <td className="py-2.5 px-3 text-right text-white font-bold">
+                              <td className="py-2.5 px-3 text-right text-zinc-900 dark:text-white font-bold">
                                 ₹{(item.quantity * item.unitPriceSnapshot).toFixed(2)}
                               </td>
                             </tr>
                           ))}
                         </tbody>
                         <tfoot>
-                          <tr className="border-t border-ops-800 bg-ops-950 font-mono text-xs">
-                            <td colSpan={2} className="py-3 px-3 font-bold uppercase text-slate-300">
+                          <tr className="border-t border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950 font-mono text-xs">
+                            <td colSpan={2} className="py-3 px-3 font-bold uppercase text-zinc-700 dark:text-zinc-300">
                               Total Dispatch Quantities
                             </td>
-                            <td className="py-3 px-3 text-right font-bold text-white">
+                            <td className="py-3 px-3 text-right font-bold text-zinc-900 dark:text-white">
                               {detailChallan.totalQuantity} units
                             </td>
-                            <td className="py-3 px-3 text-right uppercase text-slate-400">
+                            <td className="py-3 px-3 text-right uppercase text-zinc-500 dark:text-zinc-400">
                               Grand Total:
                             </td>
-                            <td className="py-3 px-3 text-right font-bold text-amber-glow text-sm">
+                            <td className="py-3 px-3 text-right font-bold text-orange-600 dark:text-orange-400 text-sm">
                               ₹{detailChallan.totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                             </td>
                           </tr>
@@ -589,25 +564,25 @@ export const ChallansPage: React.FC = () => {
                   </div>
 
                   {/* Status Business Logic Explanation */}
-                  <div className="p-3.5 rounded bg-ops-950/70 border border-ops-800 text-xs space-y-1">
-                    <div className="font-mono text-[11px] uppercase text-slate-400 font-bold">
+                  <div className="p-4 rounded-xl bg-zinc-50 dark:bg-zinc-950/70 border border-zinc-200 dark:border-zinc-800 text-xs space-y-1">
+                    <div className="font-mono text-[11px] uppercase text-zinc-500 dark:text-zinc-400 font-bold">
                       Business Rules & Inventory Interaction:
                     </div>
                     {detailChallan.status === 'DRAFT' && (
-                      <p className="text-slate-300">
-                        This challan is currently in <span className="text-amber-bright font-bold">DRAFT</span> status.
+                      <p className="text-zinc-700 dark:text-zinc-300">
+                        This challan is currently in <span className="text-orange-600 dark:text-orange-400 font-bold">DRAFT</span> status.
                         Confirming will verify inventory availability for every product line and atomically decrement
                         warehouse stock.
                       </p>
                     )}
                     {detailChallan.status === 'CONFIRMED' && (
-                      <p className="text-emerald-300">
+                      <p className="text-emerald-700 dark:text-emerald-300 font-medium">
                         This challan is <span className="font-bold">CONFIRMED</span>. Stock was decremented from the
                         warehouse. Cancelling will reverse the deduction and restore stock units back to inventory.
                       </p>
                     )}
                     {detailChallan.status === 'CANCELLED' && (
-                      <p className="text-rose-300">
+                      <p className="text-red-700 dark:text-red-300 font-medium">
                         This challan is <span className="font-bold">CANCELLED</span>. Any previously dispatched items have
                         been safely returned to inventory stock.
                       </p>
@@ -619,15 +594,15 @@ export const ChallansPage: React.FC = () => {
 
             {/* Footer Actions */}
             {detailChallan && canManageChallans && (
-              <div className="p-4 border-t border-ops-800 bg-ops-950/80 flex items-center justify-between">
+              <div className="p-4 border-t border-zinc-200 dark:border-zinc-800 bg-zinc-50/80 dark:bg-zinc-950/80 flex items-center justify-between">
                 <div>
                   {detailChallan.status !== 'CANCELLED' && (
                     <button
                       onClick={() => cancelMutation.mutate(detailChallan.id)}
                       disabled={cancelMutation.isPending}
-                      className="px-3 py-1.5 rounded bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-rose-300 text-xs font-mono flex items-center gap-1.5"
+                      className="px-3.5 py-2 rounded-xl bg-red-50 dark:bg-red-500/10 hover:bg-red-100 dark:hover:bg-red-500/20 border border-red-200 dark:border-red-500/30 text-red-600 dark:text-red-300 text-xs font-mono flex items-center gap-1.5 transition-colors font-medium"
                     >
-                      <XCircle className="w-4 h-4 text-rose-400" />
+                      <XCircle className="w-4 h-4 text-red-500" />
                       <span>{detailChallan.status === 'CONFIRMED' ? 'Cancel & Restock Items' : 'Cancel Draft'}</span>
                     </button>
                   )}
@@ -638,7 +613,7 @@ export const ChallansPage: React.FC = () => {
                     <button
                       onClick={() => confirmMutation.mutate(detailChallan.id)}
                       disabled={confirmMutation.isPending}
-                      className="px-4 py-2 rounded bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs font-mono uppercase tracking-wider flex items-center gap-2 shadow"
+                      className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs font-mono uppercase tracking-wider flex items-center gap-2 shadow-sm transition-colors"
                     >
                       <CheckCircle2 className="w-4 h-4" />
                       <span>{confirmMutation.isPending ? 'Validating Stock...' : 'Confirm & Dispatch Stock'}</span>
@@ -647,7 +622,7 @@ export const ChallansPage: React.FC = () => {
 
                   <button
                     onClick={() => setSelectedChallanId(null)}
-                    className="px-4 py-2 rounded bg-ops-800 hover:bg-ops-700 text-xs font-mono text-slate-300"
+                    className="px-4 py-2 rounded-xl bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-xs font-mono text-zinc-700 dark:text-zinc-300 transition-colors"
                   >
                     Close
                   </button>
@@ -660,20 +635,20 @@ export const ChallansPage: React.FC = () => {
 
       {/* 5. Create Sales Challan Modal */}
       {isCreateModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="w-full max-w-2xl bg-ops-900 border border-ops-800 rounded-lg shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
-            <div className="p-4 border-b border-ops-800 flex items-center justify-between">
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="w-full max-w-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
+            <div className="p-4 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between">
               <div>
-                <div className="text-[10px] font-mono uppercase tracking-wider text-slate-400">
+                <div className="text-[10px] font-mono uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
                   Outbound Logistics
                 </div>
-                <h2 className="text-sm font-bold text-white font-mono uppercase tracking-wider">
+                <h2 className="text-sm font-bold text-zinc-900 dark:text-white font-mono uppercase tracking-wider">
                   New Sales Delivery Challan
                 </h2>
               </div>
               <button
                 onClick={() => setIsCreateModalOpen(false)}
-                className="p-1 text-slate-400 hover:text-white"
+                className="p-1 text-zinc-400 hover:text-zinc-700 dark:hover:text-white"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -682,14 +657,14 @@ export const ChallansPage: React.FC = () => {
             <form onSubmit={handleCreateSubmit} className="flex-1 overflow-y-auto p-5 space-y-4">
               {/* Customer Selector */}
               <div>
-                <label className="block text-[11px] font-mono uppercase text-slate-400 mb-1">
+                <label className="block text-[11px] font-mono uppercase text-zinc-500 dark:text-zinc-400 mb-1">
                   Select Consignee Customer *
                 </label>
                 <select
                   required
                   value={selectedCustomerId}
                   onChange={(e) => setSelectedCustomerId(e.target.value)}
-                  className="w-full bg-ops-950 border border-ops-700 rounded px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-amber-bright"
+                  className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-700 rounded-xl px-3 py-2 text-xs text-zinc-900 dark:text-white font-mono focus:outline-none focus:border-orange-500"
                 >
                   <option value="">-- Choose Wholesale / Retail Customer --</option>
                   {customerList.map((c) => (
@@ -703,13 +678,13 @@ export const ChallansPage: React.FC = () => {
               {/* Product Lines */}
               <div>
                 <div className="flex items-center justify-between mb-2">
-                  <label className="text-[11px] font-mono uppercase text-slate-400 font-bold">
+                  <label className="text-[11px] font-mono uppercase text-zinc-500 dark:text-zinc-400 font-bold">
                     Products To Dispatch *
                   </label>
                   <button
                     type="button"
                     onClick={handleAddItem}
-                    className="text-[11px] font-mono text-amber-bright hover:underline flex items-center gap-1"
+                    className="text-[11px] font-mono text-orange-600 dark:text-orange-400 hover:underline flex items-center gap-1 font-semibold"
                   >
                     <Plus className="w-3.5 h-3.5" />
                     <span>Add Product Row</span>
@@ -724,8 +699,8 @@ export const ChallansPage: React.FC = () => {
                     return (
                       <div
                         key={index}
-                        className={`p-3 rounded bg-ops-950 border ${
-                          isShort ? 'border-rose-500/50' : 'border-ops-800'
+                        className={`p-3 rounded-xl bg-zinc-50 dark:bg-zinc-950 border ${
+                          isShort ? 'border-red-300 dark:border-red-500/50' : 'border-zinc-200 dark:border-zinc-800'
                         } space-y-2`}
                       >
                         <div className="flex items-center gap-3">
@@ -735,7 +710,7 @@ export const ChallansPage: React.FC = () => {
                               required
                               value={item.productId}
                               onChange={(e) => handleItemChange(index, 'productId', e.target.value)}
-                              className="w-full bg-ops-900 border border-ops-700 rounded px-2.5 py-1.5 text-xs text-white font-mono focus:outline-none focus:border-amber-bright"
+                              className="w-full bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-xl px-2.5 py-2 text-xs text-zinc-900 dark:text-white font-mono focus:outline-none focus:border-orange-500"
                             >
                               <option value="">-- Choose Product --</option>
                               {productList.map((p) => (
@@ -761,12 +736,12 @@ export const ChallansPage: React.FC = () => {
                                 )
                               }
                               placeholder="Qty"
-                              className="w-full bg-ops-900 border border-ops-700 rounded px-2 py-1.5 text-xs text-white font-mono text-right focus:outline-none focus:border-amber-bright"
+                              className="w-full bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-xl px-2 py-2 text-xs text-zinc-900 dark:text-white font-mono text-right focus:outline-none focus:border-orange-500"
                             />
                           </div>
 
                           {/* Line total */}
-                          <div className="w-24 text-right font-mono text-xs font-bold text-amber-glow">
+                          <div className="w-24 text-right font-mono text-xs font-bold text-orange-600 dark:text-orange-400">
                             ₹
                             {selectedProd
                               ? (selectedProd.unitPrice * item.quantity).toFixed(2)
@@ -778,7 +753,7 @@ export const ChallansPage: React.FC = () => {
                             <button
                               type="button"
                               onClick={() => handleRemoveItem(index)}
-                              className="p-1.5 text-slate-500 hover:text-rose-400 transition-colors"
+                              className="p-1.5 text-zinc-400 hover:text-red-500 transition-colors"
                               title="Remove item row"
                             >
                               <Trash2 className="w-4 h-4" />
@@ -789,11 +764,11 @@ export const ChallansPage: React.FC = () => {
                         {/* Live Stock Warning */}
                         {selectedProd && (
                           <div className="flex items-center justify-between text-[11px] font-mono px-1">
-                            <span className="text-slate-400">
+                            <span className="text-zinc-500 dark:text-zinc-400">
                               Bay: {selectedProd.location} | Available Stock: {selectedProd.currentStock}
                             </span>
                             {isShort && (
-                              <span className="text-rose-400 font-bold flex items-center gap-1">
+                              <span className="text-red-600 dark:text-red-400 font-bold flex items-center gap-1">
                                 <AlertTriangle className="w-3.5 h-3.5" />
                                 <span>Insufficient Stock (Short by {item.quantity - selectedProd.currentStock})</span>
                               </span>
@@ -807,14 +782,14 @@ export const ChallansPage: React.FC = () => {
               </div>
 
               {/* Order Totals Summary */}
-              <div className="p-3.5 rounded bg-ops-950 border border-ops-800 flex items-center justify-between font-mono text-xs">
+              <div className="p-3.5 rounded-xl bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 flex items-center justify-between font-mono text-xs">
                 <div>
-                  <span className="text-slate-400">Total Items: </span>
-                  <span className="text-white font-bold">{totalOrderQty} Units</span>
+                  <span className="text-zinc-500 dark:text-zinc-400">Total Items: </span>
+                  <span className="text-zinc-900 dark:text-white font-bold">{totalOrderQty} Units</span>
                 </div>
                 <div>
-                  <span className="text-slate-400">Estimated Total: </span>
-                  <span className="text-amber-glow font-bold text-sm">
+                  <span className="text-zinc-500 dark:text-zinc-400">Estimated Total: </span>
+                  <span className="text-orange-600 dark:text-orange-400 font-bold text-sm">
                     ₹{totalOrderEst.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                   </span>
                 </div>
@@ -827,33 +802,33 @@ export const ChallansPage: React.FC = () => {
                   id="confirmImmediate"
                   checked={isConfirmingImmediately}
                   onChange={(e) => setIsConfirmingImmediately(e.target.checked)}
-                  className="mt-0.5 rounded border-ops-700 bg-ops-950 text-amber-bright focus:ring-0"
+                  className="mt-0.5 rounded border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 text-orange-500 focus:ring-0"
                 />
-                <label htmlFor="confirmImmediate" className="text-xs text-slate-300">
+                <label htmlFor="confirmImmediate" className="text-xs text-zinc-700 dark:text-zinc-300">
                   Confirm and decrement warehouse stock immediately (saves as CONFIRMED rather than DRAFT)
                 </label>
               </div>
 
               {hasInsufficientStock && isConfirmingImmediately && (
-                <div className="p-2.5 rounded bg-rose-500/15 border border-rose-500/30 text-xs text-rose-300 flex items-center gap-2">
-                  <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
+                <div className="p-3 rounded-xl bg-red-50 dark:bg-red-500/15 border border-red-200 dark:border-red-500/30 text-xs text-red-700 dark:text-red-300 flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4 text-red-500 shrink-0" />
                   <span>
                     Warning: One or more products exceed current warehouse stock. Direct confirmation will be rejected.
                   </span>
                 </div>
               )}
 
-              <div className="flex items-center justify-end gap-2 pt-3 border-t border-ops-800">
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-zinc-200 dark:border-zinc-800">
                 <button
                   type="button"
                   onClick={() => setIsCreateModalOpen(false)}
-                  className="px-4 py-2 rounded bg-ops-800 hover:bg-ops-700 text-xs font-mono text-slate-300"
+                  className="px-4 py-2 rounded-xl bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-xs font-mono text-zinc-700 dark:text-zinc-300"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 rounded bg-amber-accent hover:bg-amber-bright text-ops-950 font-bold text-xs font-mono uppercase tracking-wider"
+                  className="px-4 py-2 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs font-mono uppercase tracking-wider transition-colors shadow-sm"
                 >
                   {isConfirmingImmediately ? 'Create & Confirm Challan' : 'Save As Draft Challan'}
                 </button>

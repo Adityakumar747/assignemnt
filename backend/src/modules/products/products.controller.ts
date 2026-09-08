@@ -69,3 +69,12 @@ export async function getAllStockMovements(req: Request, res: Response): Promise
     meta: result.meta
   });
 }
+
+export async function deleteProduct(req: Request, res: Response): Promise<void> {
+  await productService.deleteProduct(req.params.id as string);
+  res.status(200).json({
+    success: true,
+    message: 'Product deleted successfully from inventory'
+  });
+}
+

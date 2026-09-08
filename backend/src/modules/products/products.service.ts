@@ -275,3 +275,42 @@ export async function getAllStockMovements(query: StockMovementQueryInput) {
     }
   };
 }
+
+export async function deleteProduct(id: string) {
+  const product = await prisma.product.findUnique({
+    where: { id },
+    include: {
+      _count: {
+        select: {
+          challanItems: true,
+          stockMovements: true
+        }
+      }
+    }
+  });
+
+  if (!product) {
+    throw new NotFoundError('Product');
+  }
+
+  // If product is referenced in historical challans, prevent deletion to preserve order snapshot integrity
+  if (product._count.challanItems > 0) {
+    throw new AppError(
+      `Cannot delete product '${product.name}' (${product.sku}) because it is linked to ${product._count.challanItems} sales challan(s). Archive or set stock to 0 instead.`,
+      400
+    );
+  }
+
+  return prisma.$transaction(async (tx) => {
+    if (product._count.stockMovements > 0) {
+      await tx.stockMovement.deleteMany({
+        where: { productId: id }
+      });
+    }
+
+    return tx.product.delete({
+      where: { id }
+    });
+  });
+}
+
