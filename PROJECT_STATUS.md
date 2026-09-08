@@ -23,9 +23,9 @@
 | **Phase 1** | Database Schema & Seed Data | ✅ Completed | PostgreSQL 18.4 running, Prisma schema applied (7 models, enums), seeded 4 roles, 8 products with varied stock, 3 customers, initial stock movements |
 | **Phase 2** | Auth & RBAC Middleware | ✅ Completed | Login (JWT), /me, authenticate, authorize role guards. All 4 roles tested & verified |
 | **Phase 3** | Customer CRM Module | ✅ Completed | CRUD, Zod validation, search, filter, pagination, notes timeline, RBAC tested & verified |
-| **Phase 4** | Product & Inventory Module | ✅ Completed | CRUD, low stock filter, atomic stock IN/OUT transactions, negative check, movement ledger & RBAC verified |
+| **Phase 4** | Product & Inventory Module | ✅ Completed | CRUD, low stock filter, atomic stock IN/OUT transactions, negative check, movement ledger, Admin product deletion & RBAC verified |
 | **Phase 5** | Sales Challan Module | ✅ Completed | Sequential numbers (CH-YYYY-XXXX), product snapshots, atomic confirm stock reduction, cancel restock transaction, PDF export & RBAC verified |
-| **Phase 6** | Frontend Industrial Console | ✅ Completed | Redesigned with Orange, Black, and Grey theme. Clean split-screen Login (form left, logistics hero image right with organic curved divider), evaluator role switcher |
+| **Phase 6** | Frontend Industrial Console | ✅ Completed | Redesigned with Bright Orange, Black, and White/Grey theme. Light/Dark mode toggle with persistent state. Clean split-screen Login (form left, logistics hero image right with organic curved divider), evaluator role switcher, admin product deletion UI |
 | **Phase 7** | Polish, PDF, Docker & Postman | ✅ Completed | Server PDFKit export, docker-compose.yml, backend/frontend Dockerfiles, nginx.conf, Postman collection (v2.1), comprehensive README.md |
 
 ---
