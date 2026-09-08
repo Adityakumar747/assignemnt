@@ -87,3 +87,5 @@ scratch/
 # ── Internal build/status tracking docs ──────────
 # These are internal workflow files, not needed in the submitted repo
 PROJECT_STATUS.md
+VIDEO_SCRIPT.md
+CHECKLIST.md
