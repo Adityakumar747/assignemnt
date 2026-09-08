@@ -6,6 +6,7 @@ import { errorHandler } from './middleware/errorHandler.js';
 import authRoutes from './modules/auth/auth.routes.js';
 import customerRoutes from './modules/customers/customers.routes.js';
 import productRoutes from './modules/products/products.routes.js';
+import challanRoutes from './modules/challans/challans.routes.js';
 
 export const app = express();
 
@@ -44,6 +45,9 @@ app.use('/customers', customerRoutes);
 
 app.use('/api/products', productRoutes);
 app.use('/products', productRoutes);
+
+app.use('/api/challans', challanRoutes);
+app.use('/challans', challanRoutes);
 
 // 404 Handler for undefined routes
 app.use((req, res) => {
