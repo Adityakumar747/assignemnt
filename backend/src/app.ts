@@ -4,6 +4,7 @@ import 'express-async-errors';
 import { env } from './config/env.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import authRoutes from './modules/auth/auth.routes.js';
+import customerRoutes from './modules/customers/customers.routes.js';
 
 export const app = express();
 
@@ -35,8 +36,10 @@ app.get('/health', (_req, res) => {
 
 // Mount Module Routes
 app.use('/api/auth', authRoutes);
-// Direct alias for assignment compatibility: POST /auth/login, GET /auth/me
 app.use('/auth', authRoutes);
+
+app.use('/api/customers', customerRoutes);
+app.use('/customers', customerRoutes);
 
 // 404 Handler for undefined routes
 app.use((req, res) => {
