@@ -21,8 +21,8 @@
 | :--- | :--- | :--- | :--- |
 | **Phase 0** | Project Init & Git Monorepo | ✅ Completed | Git initialized, monorepo structure created, `.gitignore` active |
 | **Phase 1** | Database Schema & Seed Data | ✅ Completed | PostgreSQL 18.4 running, Prisma schema applied (7 models, enums), seeded 4 roles, 8 products with varied stock, 3 customers, initial stock movements |
-| **Phase 2** | Auth & RBAC Middleware | 🔄 In Progress | Login (JWT), /me, authenticate, authorize role guards |
-| **Phase 3** | Customer CRM Module | ⏳ Pending | CRUD, validation, search, filter, pagination, notes timeline |
+| **Phase 2** | Auth & RBAC Middleware | ✅ Completed | Login (JWT), /me, authenticate, authorize role guards. All 4 roles tested & verified |
+| **Phase 3** | Customer CRM Module | 🔄 In Progress | CRUD, validation, search, filter, pagination, notes timeline |
 | **Phase 4** | Product & Inventory Module | ⏳ Pending | CRUD, low stock filter, atomic stock IN/OUT transactions, negative check |
 | **Phase 5** | Sales Challan Module | ⏳ Pending | Sequential numbers, product snapshotting, atomic confirm/cancel stock adjustments |
 | **Phase 6** | Frontend Industrial Console | ⏳ Pending | Custom industrial ops theme, role-based nav, dashboard, customer/product/challan screens |
