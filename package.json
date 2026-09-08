@@ -1,0 +1,15 @@
+{
+  "name": "mini-erp-crm",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Wholesale and Distribution Mini ERP + CRM Operations Portal",
+  "scripts": {
+    "dev:backend": "npm --prefix backend run dev",
+    "dev:frontend": "npm --prefix frontend run dev",
+    "build": "npm --prefix backend run build && npm --prefix frontend run build",
+    "lint": "npm --prefix backend run lint && npm --prefix frontend run lint"
+  },
+  "keywords": ["erp", "crm", "wholesale", "distribution", "inventory", "challan"],
+  "author": "Ops Team",
+  "license": "ISC"
+}

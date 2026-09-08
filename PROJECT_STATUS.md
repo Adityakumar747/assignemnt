@@ -19,9 +19,9 @@
 
 | Phase | Description | Status | Verification & Checks |
 | :--- | :--- | :--- | :--- |
-| **Phase 0** | Project Init & Git Monorepo | 🔄 In Progress | Git initialized, structure created, `.gitignore` active |
-| **Phase 1** | Database Schema & Seed Data | ⏳ Pending | Prisma schema with all 7 models, enums, migrations, seed script (4 roles, 8 products) |
-| **Phase 2** | Auth & RBAC Middleware | ⏳ Pending | Login (JWT), /me, authenticate, authorize role guards |
+| **Phase 0** | Project Init & Git Monorepo | ✅ Completed | Git initialized, monorepo structure created, `.gitignore` active |
+| **Phase 1** | Database Schema & Seed Data | ✅ Completed | PostgreSQL 18.4 running, Prisma schema applied (7 models, enums), seeded 4 roles, 8 products with varied stock, 3 customers, initial stock movements |
+| **Phase 2** | Auth & RBAC Middleware | 🔄 In Progress | Login (JWT), /me, authenticate, authorize role guards |
 | **Phase 3** | Customer CRM Module | ⏳ Pending | CRUD, validation, search, filter, pagination, notes timeline |
 | **Phase 4** | Product & Inventory Module | ⏳ Pending | CRUD, low stock filter, atomic stock IN/OUT transactions, negative check |
 | **Phase 5** | Sales Challan Module | ⏳ Pending | Sequential numbers, product snapshotting, atomic confirm/cancel stock adjustments |
